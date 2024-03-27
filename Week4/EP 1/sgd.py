@@ -91,7 +91,6 @@ def sgd(f,
         # Será util imprimir seu progresso após algumas iterações
 
         loss = None
-        grad = None
         ### Seu Código Aqui (~2 lines)
         loss, grad = f(x)
         x -= step * grad
@@ -103,7 +102,7 @@ def sgd(f,
                 exploss = loss
             else:
                 exploss = .95 * exploss + .05 * loss
-            print("iter %d: %f" % (iter, exploss))
+            print(f"Iteração No.{iter}, Loss: {exploss:f}")
 
         if iter % SAVE_PARAMS_EVERY == 0 and useSaved:
             save_params(iter, x)
@@ -134,6 +133,9 @@ def sanity_check():
     print("TODOS OS TESTES FORAM PASSADOS")
     print("-" * 40)
 
+def main():
+    # main pro autograder do coursera, não mexer
+    sanity_check()
 
 if __name__ == "__main__":
     sanity_check()

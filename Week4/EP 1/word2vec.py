@@ -3,8 +3,6 @@
 import numpy as np
 import random
 
-from utils.gradcheck import gradcheck_naive, grad_tests_softmax, grad_tests_negsamp
-
 
 def sigmoid(x):
     """
@@ -16,7 +14,9 @@ def sigmoid(x):
     """
 
     ### Seu código aqui (~1 Linha)
-    s = 1/(1 + np.exp(-x))
+
+    s = 1 / (1 + np.exp(-x))
+
     ### Fim do seu código
 
     return s
@@ -79,16 +79,20 @@ def naiveSoftmaxLossAndGradient(centerWordVec, outsideWordIdx, outsideVectors, d
     """
 
     ### Seu código aqui (~6-8 Lines)
-    h = np.dot(outsideVectors, centerWordVec)
-    yhat = softmax(h)
-    loss = -1.0 * np.log(yhat[outsideWordIdx])
-    yhat[outsideWordIdx] -= 1
-    gradCenterVec = np.dot(outsideVectors.T, yhat)
-    gradOutsideVecs = np.dot(yhat.reshape(-1,1), centerWordVec.reshape(-1,1).T)
 
     ### Use a função softmax fornecida (importada anteriormente neste arquivo)
     ### Esta implementação numericamente estável ajuda a evitar problemas causados
     ### por estouro de inteiro (integer overflow).
+    
+    scores = np.dot(outsideVectors, centerWordVec)
+    probs = softmax(scores)
+
+    loss = -np.log(probs[outsideWordIdx])
+
+    dscores = probs.copy()
+    dscores[outsideWordIdx] -= 1
+    gradCenterVec = np.dot(outsideVectors.T, dscores)
+    gradOutsideVecs = np.outer(dscores, centerWordVec)
 
     ### END YOUR CODE
 
@@ -129,20 +133,20 @@ def negSamplingLossAndGradient(
     indices = [outsideWordIdx] + negSampleWordIndices
 
     ### Seu código aqui  (~10 Lines)
-    gradOutsideVecs = np.zeros(outsideVectors.shape)
-    uo = outsideVectors[outsideWordIdx]
-    vc = centerWordVec
-    uk = outsideVectors[negSampleWordIndices]
 
-    z = sigmoid(np.dot(uo, vc))
-    h = sigmoid(np.dot(-uk, vc))
+    dot_one = outsideVectors[outsideWordIdx].T.dot(centerWordVec)
+    neg_samples = outsideVectors[negSampleWordIndices] 
+    dot_two = -neg_samples.dot(centerWordVec)
+    loss = -np.log(sigmoid(dot_one)) - np.sum(np.log(sigmoid(dot_two)))
+    
+    gradCenterVec = -(1 - sigmoid(dot_one)) * outsideVectors[outsideWordIdx] + np.sum(
+        (np.expand_dims(1 - sigmoid(dot_two),axis=1) * neg_samples), axis=0)
 
-    loss = - np.log(z) - np.sum(np.log(h))
-    gradCenterVec = np.dot((1 - h), uk) - np.dot((1 - z), uo)
-    gradOutsideVecs[outsideWordIdx] = np.dot((z - 1), vc)
+    gradOutsideVecs = np.zeros(shape=outsideVectors.shape)
+    gradOutsideVecs[outsideWordIdx] = -(1 - sigmoid(dot_one)) * centerWordVec
+    for i,neg_idx in enumerate(negSampleWordIndices):
+        gradOutsideVecs[neg_idx] += (1 - sigmoid(dot_two)[i]) * centerWordVec
 
-    for i, negIndex in enumerate(negSampleWordIndices):
-        gradOutsideVecs[negIndex] += (1 - h[i]) * vc
     ### Use sua implementação da função sigmoid aqui.
 
     return loss, gradCenterVec, gradOutsideVecs
@@ -194,16 +198,13 @@ def skipgram(
     gradOutsideVectors = np.zeros(outsideVectors.shape)
 
     ### Seu código aqui (~8 Lines)
-    centerWordVec = centerWordVectors[word2Ind[currentCenterWord]]
-    
-    
-    for word in outsideWords:
-        outsideWordIdx = word2Ind[word]
-        lossActualWord, gradCenter, gradOut = word2vecLossAndGradient(centerWordVec, outsideWordIdx, outsideVectors, dataset)
 
-        loss += lossActualWord
-        gradOutsideVectors += gradOut
-        gradCenterVecs[word2Ind[currentCenterWord]] += gradCenter
+    for word in outsideWords:
+        loss_gradients = list(word2vecLossAndGradient(
+            centerWordVectors[word2Ind[currentCenterWord]], word2Ind[word], outsideVectors, dataset))
+        loss += loss_gradients[0] 
+        gradCenterVecs[word2Ind[currentCenterWord]] += loss_gradients[1]
+        gradOutsideVectors += loss_gradients[2]
     ### Seu código acaba aqui
 
     return loss, gradCenterVecs, gradOutsideVectors
@@ -595,6 +596,9 @@ def test_word2vec():
         skipgram, dummy_tokens, dummy_vectors, dataset, negSamplingLossAndGradient
     )
 
+def main():
+    # main pro autograder do coursera, não mexer
+    test_word2vec()
 
 if __name__ == "__main__":
     test_word2vec()
